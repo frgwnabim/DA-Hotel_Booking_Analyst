@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard Pembatalan Hotel</title>
+  <meta name="description" content="Analisis dan prediksi pembatalan booking hotel: pola pembatalan, uji hipotesis, dan perbandingan Logistic Regression, Random Forest, dan XGBoost.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Crect x='7' y='16' width='4' height='9' rx='1' fill='white'/%3E%3Crect x='14' y='10' width='4' height='15' rx='1' fill='white'/%3E%3Crect x='21' y='6' width='4' height='19' rx='1' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div>
+        <p class="eyebrow">Hotel Booking Analytics</p>
+        <h1>Dashboard Pembatalan Booking Hotel</h1>
+        <p class="subtitle" id="subtitle">Memuat data...</p>
+      </div>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Ganti tema terang/gelap">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z" fill="currentColor"/></svg>
+        <span>Tema</span>
+      </button>
+    </div>
+    <nav class="wrap sectionnav" aria-label="Navigasi bagian">
+      <a href="#ringkasan">Ringkasan</a>
+      <a href="#pola">Pola Pembatalan</a>
+      <a href="#hipotesis">Uji Hipotesis</a>
+      <a href="#model">Perbandingan Model</a>
+      <a href="#threshold">Simulasi Threshold</a>
+      <a href="#insight">Insight</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <!-- ===================== RINGKASAN + POLA (difilter per hotel) ===================== -->
+    <section id="ringkasan" class="section">
+      <div class="filterbar" role="group" aria-label="Filter tipe hotel">
+        <span class="filter-label">Tipe hotel</span>
+        <div class="segmented" id="hotelFilter">
+          <button type="button" data-seg="Semua" aria-pressed="true">Semua</button>
+          <button type="button" data-seg="City Hotel" aria-pressed="false">City Hotel</button>
+          <button type="button" data-seg="Resort Hotel" aria-pressed="false">Resort Hotel</button>
+        </div>
+        <span class="filter-note">Berlaku untuk Ringkasan dan Pola Pembatalan</span>
+      </div>
+
+      <div class="hero-grid">
+        <div class="card hero">
+          <p class="tile-label">Cancellation rate</p>
+          <p class="hero-value" id="heroRate">-</p>
+          <p class="tile-sub" id="heroSub"></p>
+        </div>
+        <div class="tiles" id="kpiTiles"></div>
+      </div>
+    </section>
+
+    <section id="pola" class="section">
+      <h2>Pola Pembatalan</h2>
+      <p class="section-lead">Cancellation rate per kelompok. Arahkan kursor ke batang untuk melihat jumlah booking.</p>
+      <div class="grid-2">
+        <figure class="card chart-card">
+          <figcaption><h3>Semakin jauh hari booking, semakin sering batal</h3><p>Cancellation rate per rentang lead time (hari)</p></figcaption>
+          <div class="chart" id="chLead"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>Special request menandakan komitmen</h3><p>Cancellation rate per jumlah special request</p></figcaption>
+          <div class="chart" id="chReq"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>Segmen pasar</h3><p>Cancellation rate per market segment</p></figcaption>
+          <div class="chart" id="chSegment"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>Tipe deposit dan tipe pelanggan</h3><p>Non Refund justru paling sering batal (dominan booking grup)</p></figcaption>
+          <div class="chart" id="chDeposit"></div>
+          <div class="chart" id="chCustomer"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>Volume booking per bulan kedatangan</h3><p>Jumlah booking (setelah pembersihan data)</p></figcaption>
+          <div class="chart" id="chMonthVol"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>Cancellation rate per bulan kedatangan</h3><p>Musim ramai cenderung lebih banyak pembatalan</p></figcaption>
+          <div class="chart" id="chMonthRate"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>10 negara asal terbanyak</h3><p>Cancellation rate, diurutkan dari jumlah booking terbanyak</p></figcaption>
+          <div class="chart" id="chCountry"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>Parkir dan tamu berulang</h3><p>Tamu yang minta parkir tidak pernah membatalkan</p></figcaption>
+          <div class="chart" id="chParking"></div>
+          <div class="chart" id="chRepeated"></div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ===================== HIPOTESIS ===================== -->
+    <section id="hipotesis" class="section">
+      <h2>Uji Hipotesis</h2>
+      <p class="section-lead">Validasi statistik temuan EDA dengan alpha = 0,05. Data tidak berdistribusi normal (Shapiro-Wilk), sehingga perbandingan dua kelompok memakai Mann-Whitney U.</p>
+      <div class="grid-2">
+        <figure class="card chart-card">
+          <figcaption><h3>Mann-Whitney U: batal vs tidak batal</h3><p>Semua perbedaan signifikan; effect size (rank-biserial r) menunjukkan besarnya</p></figcaption>
+          <div class="table-wrap" id="tblMW"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>Chi-Square: kekuatan asosiasi dengan pembatalan</h3><p>Cramer's V. Garis bantu: 0,1 (lemah ke sedang) dan 0,3 (sedang ke kuat)</p></figcaption>
+          <div class="chart" id="chChi"></div>
+        </figure>
+      </div>
+      <figure class="card chart-card">
+        <figcaption><h3>Logistic Regression (statsmodels Logit): pengaruh tiap fitur</h3><p id="logitSub">Koefisien log-odds; fitur numerik distandarisasi</p></figcaption>
+        <div class="legend" id="lgLogit"></div>
+        <div class="chart" id="chLogit"></div>
+      </figure>
+    </section>
+
+    <!-- ===================== MODEL ===================== -->
+    <section id="model" class="section">
+      <h2>Perbandingan Model</h2>
+      <p class="section-lead" id="modelLead"></p>
+      <div class="tiles tiles-4" id="modelTiles"></div>
+      <div class="grid-2">
+        <figure class="card chart-card">
+          <figcaption><h3>Metrik pada data uji (setelah tuning)</h3><p>Semakin tinggi semakin baik</p></figcaption>
+          <div class="legend" id="lgMetrics"></div>
+          <div class="chart" id="chMetrics"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3>ROC curve (setelah tuning)</h3><p>Semakin melengkung ke kiri atas semakin baik; garis abu = tebakan acak</p></figcaption>
+          <div class="legend" id="lgRoc"></div>
+          <div class="chart" id="chRoc"></div>
+        </figure>
+      </div>
+      <figure class="card chart-card">
+        <figcaption><h3>Baseline vs tuned</h3><p>Metrik data uji dan ROC-AUC 5-fold stratified cross-validation pada data latih</p></figcaption>
+        <div class="table-wrap" id="tblModels"></div>
+      </figure>
+      <div class="grid-2">
+        <figure class="card chart-card">
+          <figcaption><h3>Confusion matrix (threshold 0,5)</h3><p>Pilih model untuk membandingkan</p></figcaption>
+          <div class="segmented small" id="cmPicker"></div>
+          <div class="cm" id="cmGrid"></div>
+        </figure>
+        <figure class="card chart-card">
+          <figcaption><h3 id="impTitle">Feature importance</h3><p>15 fitur paling berpengaruh pada model terbaik</p></figcaption>
+          <div class="chart" id="chImp"></div>
+        </figure>
+      </div>
+      <details class="card details-card">
+        <summary>Hyperparameter terbaik tiap model</summary>
+        <div class="table-wrap" id="tblParams"></div>
+      </details>
+    </section>
+
+    <!-- ===================== THRESHOLD ===================== -->
+    <section id="threshold" class="section">
+      <h2>Simulasi Threshold</h2>
+      <p class="section-lead" id="thrLead"></p>
+      <div class="card thr-card">
+        <div class="thr-control">
+          <label for="thrInput">Threshold probabilitas batal</label>
+          <input type="range" id="thrInput" min="0.05" max="0.95" step="0.01" value="0.5">
+          <output id="thrOut" for="thrInput">0,50</output>
+        </div>
+        <div class="tiles tiles-4" id="thrTiles"></div>
+        <div class="legend" id="lgThr"></div>
+        <div class="chart" id="chThr"></div>
+      </div>
+    </section>
+
+    <!-- ===================== INSIGHT ===================== -->
+    <section id="insight" class="section">
+      <h2>Insight &amp; Rekomendasi</h2>
+      <div class="grid-2" id="insightGrid"></div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p id="footerMeta"></p>
+    <p>Data diekspor oleh notebook <code>Hotel_Booking_Cancellation_Analysis.ipynb</code>. Kolom data pribadi (nama, email, telepon, kartu kredit) tidak diproses.</p>
+  </footer>
+
+  <div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
